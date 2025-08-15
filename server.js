@@ -83,6 +83,9 @@ module.exports = defineConfig({
             headed: false,
             config: {
                 video: false,
+                // --- ADDITION: Increase command timeout ---
+                // This gives commands more time to complete, which is useful on slower CI environments.
+                commandTimeout: 60000 // 60 seconds
             },
         });
 
