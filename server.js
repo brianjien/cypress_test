@@ -34,7 +34,7 @@ app.post('/run-test', upload.single('testFile'), async (req, res) => {
         await fs.ensureDir(cypressIntegrationPath);
         await fs.move(testFileOriginalPath, testFileNewPath);
 
-        // --- FIX: Create a modern cypress.config.js file for Cypress v10+ ---
+        // Create a modern cypress.config.js file for Cypress v10+
         const cypressConfigFileContent = `
 const { defineConfig } = require('cypress');
 
@@ -57,15 +57,30 @@ module.exports = defineConfig({
 });
 `;
         await fs.writeFile(path.join(projectRoot, 'cypress.config.js'), cypressConfigFileContent);
-        // --- End of Fix ---
 
         console.log(`Running test: ${testFileNewPath}`);
         const results = await cypress.run({
-            project: projectRoot, // Run cypress within the temp project
+            project: projectRoot,
             spec: testFileNewPath,
+            // --- FIX: Add browser launch options for Docker environment ---
+            browser: 'electron',
             config: {
                 video: false,
             },
+            headed: false,
+            // The following flags are often necessary for running in CI/Docker
+            config: {
+              "e2e": {
+                "setupNodeEvents(on, config)": {
+                  "on('before:browser:launch', (browser = {}, launchOptions) => {": {
+                    "if (browser.family === 'chromium' && browser.name !== 'electron')": {
+                      "launchOptions.args.push('--disable-gpu')": null
+                    },
+                    "return launchOptions": null
+                  }
+                }
+              }
+            }
         });
 
         const reportPath = path.join(reportDir, reportFilename);
