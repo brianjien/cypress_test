@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cypress 互動式測試進度</title>
+<style>
+  :root {
+    --primary-color: #007bff;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --light-gray: #f8f9fa;
+    --dark-gray: #343a40;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--dark-gray);
+    background-color: #f7f7f7;
+    padding: 20px;
+  }
+  .container {
+    max-width: 1000px;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+  .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+  }
+  h2 {
+    text-align: center;
+    color: #444;
+    margin: 0;
+  }
+  .upload-btn {
+      padding: 10px 15px;
+      font-size: 16px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+  }
+  .upload-btn:hover {
+      background-color: #0056b3;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 12px 15px;
+    text-align: left;
+    vertical-align: middle;
+  }
+  thead th {
+    background-color: var(--light-gray);
+    font-weight: 600;
+    color: #555;
+  }
+  tbody tr:nth-of-type(even) {
+    background-color: #f9f9f9;
+  }
+  tbody tr:hover {
+    background-color: #eef4ff;
+  }
+
+  /* --- Interactive Elements --- */
+  .test-item-cell {
+    cursor: pointer;
+    color: var(--primary-color);
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .test-item-cell:hover {
+    color: #0056b3;
+    text-decoration: underline;
+  }
+  .status-select {
+    font-weight: bold;
+    border-radius: 15px;
+    padding: 6px 12px;
+    border: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-position: right 10px center;
+    background-repeat: no-repeat;
+    background-size: 12px;
+    padding-right: 30px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27292.4%27%20height%3D%27292.4%27%3E%3Cpath%20fill%3D%27%23333%27%20d%3D%27M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%27%2F%3E%3C%2Fsvg%3E");
+  }
+  .status-select.status-completed, .status-select.status-blocked, .status-select.status-failed {
+    color: white;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27292.4%27%20height%3D%27292.4%27%3E%3Cpath%20fill%3D%27%23FFFFFF%27%20d%3D%27M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%27%2F%3E%3C%2Fsvg%3E");
+  }
+  .status-testing {
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+  }
+
+  .status-inprogress { background-color: var(--warning-color); color: #333; }
+  .status-completed { background-color: var(--success-color); color: white; }
+  .status-blocked { background-color: #6c757d; color: white; }
+  .status-failed { background-color: var(--danger-color); color: white; }
+  .status-testing { background-color: var(--primary-color); color: white; }
+
+  td[contenteditable="true"]:focus {
+    outline: 2px solid var(--primary-color);
+    box-shadow: 0 0 5px rgba(0,123,255,0.5);
+    background-color: #eef4ff;
+  }
+  .report-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    background-color: #6c757d;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  .report-btn:hover {
+    background-color: #5a6268;
+  }
+  .report-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+
+  /* --- Modal Styles --- */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+  }
+  .modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 700px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  }
+  .close-btn {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .close-btn:hover, .close-btn:focus {
+    color: black;
+  }
+  #report-frame {
+    width: 100%;
+    height: 400px;
+    border: 1px solid #ccc;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h2>Cypress 互動式測試進度</h2>
+    <button id="upload-main-btn" class="upload-btn">上傳並執行測試</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>測試項目 (Test Item)</th>
+        <th>狀態 (Status)</th>
+        <th>備註 (Notes)</th>
+        <th>報告 (Report)</th>
+      </tr>
+    </thead>
+    <tbody id="test-table-body">
+      <!-- Rows will be dynamically generated by script -->
+    </tbody>
+  </table>
+</div>
+
+<!-- Report Modal -->
+<div id="reportModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn">&times;</span>
+    <h3>測試報告</h3>
+    <iframe id="report-frame" src="about:blank"></iframe>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- IMPORTANT: Replace with your deployed Render backend URL ---
+    const BACKEND_URL = 'https://your-cypress-backend.onrender.com/run-test';
+
+    // --- Initial Data ---
+    const testData = [
+        { id: 'knowledgebase', name: 'autoTest_knowledgebase.cy.js', status: 'blocked', notes: '剩餘測試範圍 1-11, 11-35 (等待 excel 腳本)', report: null },
+        { id: 'datadefine', name: 'autoTest_datadefine.cy.js', status: 'inprogress', notes: '(已增加測試步驟) 剩餘整體測試', report: null },
+        { id: 'solutions_mng', name: 'autoTest_solutions_mng.cy.js', status: 'inprogress', notes: '(已增加測試步驟) 剩餘整體測試', report: null },
+        { id: 'sys_mgmt', name: 'system and management', status: 'inprogress', notes: '(已增加測試步驟) 測試後處理 (4 of 5)', report: null },
+        { id: 'account', name: 'autoTest_account.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'activitycenter', name: 'autoTest_activitycenter.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'chart', name: 'autoTest_chart.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'dashboard', name: 'autoTest_dashboard.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'division', name: 'autoTest_division.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'materialdb', name: 'autoTest_materialdatabase.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'moldtryout1', name: 'autoTest_moldtryout_1.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'moldtryout2', name: 'autoTest_moldtryout_2.cy.js', status: 'completed', notes: '已增加 44', report: null },
+        { id: 'preferences', name: 'autoTest_preferences.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'project_sync', name: 'autoTest_project_sync.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'role1', name: 'autoTest_role-1.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'role2', name: 'autoTest_role-2.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'settings', name: 'autoTest_settings.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'task_sys', name: 'autoTest_task_sys.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'teams', name: 'autoTest_teams.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'template', name: 'autoTest_template.cy.js', status: 'completed', notes: '', report: null },
+        { id: 'workflow', name: 'autoTest_workflow.cy.js', status: 'completed', notes: '', report: null },
+    ];
+    
+    const tableBody = document.getElementById('test-table-body');
+    const modal = document.getElementById('reportModal');
+    const closeBtn = document.querySelector('.close-btn');
+    const reportFrame = document.getElementById('report-frame');
+    const mainUploadBtn = document.getElementById('upload-main-btn');
+
+    // --- Functions ---
+    const renderTable = () => {
+        tableBody.innerHTML = '';
+        testData.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="test-item-cell" data-index="${index}">${item.name}</td>
+                <td>
+                    <select class="status-select" data-index="${index}">
+                        <option value="blocked" ${item.status === 'blocked' ? 'selected' : ''}>已封鎖</option>
+                        <option value="inprogress" ${item.status === 'inprogress' ? 'selected' : ''}>進行中</option>
+                        <option value="completed" ${item.status === 'completed' ? 'selected' : ''}>已完成</option>
+                        <option value="failed" ${item.status === 'failed' ? 'selected' : ''}>失敗</option>
+                        <option value="testing" ${item.status === 'testing' ? 'selected' : ''} disabled>測試中...</option>
+                    </select>
+                </td>
+                <td contenteditable="true" data-index="${index}">${item.notes}</td>
+                <td><button class="report-btn" data-index="${index}" ${!item.report ? 'disabled' : ''}>查看報告</button></td>
+            `;
+            tableBody.appendChild(row);
+            updateStatusColor(row.querySelector('.status-select'));
+        });
+    };
+
+    const updateStatusColor = (selectElement) => {
+        const selectedValue = selectElement.value;
+        selectElement.className = 'status-select'; // Reset classes
+        selectElement.classList.add(`status-${selectedValue}`);
+    };
+
+    const handleStatusChange = (e) => {
+        const index = e.target.dataset.index;
+        const newStatus = e.target.value;
+        testData[index].status = newStatus;
+        updateStatusColor(e.target);
+    };
+
+    const handleNotesChange = (e) => {
+        const index = e.target.dataset.index;
+        testData[index].notes = e.target.textContent;
+    };
+
+    const openFileDialog = (index) => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.cy.js';
+        fileInput.onchange = (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                runTestOnBackend(index, file);
+            }
+        };
+        fileInput.click();
+    };
+
+    const runTestOnBackend = async (index, file) => {
+        // Update UI to "Testing"
+        testData[index].status = 'testing';
+        renderTable();
+
+        const formData = new FormData();
+        formData.append('testFile', file);
+
+        try {
+            const response = await fetch(BACKEND_URL, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.statusText}`);
+            }
+
+            const reportHtml = await response.text();
+            const testPassed = !reportHtml.includes('"failures": ['); // Simple check for failures in mochawesome report
+            
+            testData[index].status = testPassed ? 'completed' : 'failed';
+            testData[index].report = reportHtml;
+            
+        } catch (error) {
+            console.error('Error running test:', error);
+            testData[index].status = 'failed';
+            testData[index].report = `<h1>測試執行錯誤</h1><p>${error.message}</p>`;
+        } finally {
+            renderTable();
+        }
+    };
+
+    const handleViewReport = (e) => {
+        const index = e.target.dataset.index;
+        const reportHtml = testData[index].report;
+        if (reportHtml) {
+            reportFrame.srcdoc = reportHtml;
+            modal.style.display = 'block';
+        }
+    };
+    
+    // --- Event Listeners ---
+    tableBody.addEventListener('change', (e) => {
+        if (e.target.classList.contains('status-select')) handleStatusChange(e);
+    });
+
+    tableBody.addEventListener('input', (e) => {
+        if (e.target.hasAttribute('contenteditable')) handleNotesChange(e);
+    });
+
+    tableBody.addEventListener('click', (e) => {
+        if (e.target.classList.contains('test-item-cell')) {
+            openFileDialog(e.target.dataset.index);
+        }
+        if (e.target.classList.contains('report-btn')) {
+            handleViewReport(e);
+        }
+    });
+
+    mainUploadBtn.addEventListener('click', () => {
+        // Find first available slot to run test, or add new row
+        const firstNonCompleted = testData.findIndex(t => t.status !== 'completed');
+        const indexToRun = firstNonCompleted !== -1 ? firstNonCompleted : testData.length;
+        if(firstNonCompleted === -1) {
+             testData.push({ id: `new_test_${Date.now()}`, name: 'New Uploaded Test', status: 'inprogress', notes: '', report: null });
+        }
+        openFileDialog(indexToRun);
+    });
+
+    closeBtn.onclick = () => { modal.style.display = 'none'; };
+    window.onclick = (event) => {
+        if (event.target == modal) modal.style.display = 'none';
+    };
+
+    // --- Initial Render ---
+    renderTable();
+});
+</script>
+
+</body>
+</html>
