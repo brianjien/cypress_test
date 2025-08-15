@@ -23,7 +23,7 @@ app.post('/run-test', upload.single('testFile'), async (req, res) => {
 
     const testFileOriginalPath = req.file.path;
     const projectRoot = path.join(__dirname, `run-${Date.now()}`);
-    const cypressIntegrationPath = path.join(projectRoot, 'cypress', 'integration');
+    const cypressIntegrationPath = path.join(projectRoot, 'cypress', 'e2e'); // Updated folder for Cypress v10+
     const testFileNewPath = path.join(cypressIntegrationPath, req.file.originalname);
     
     const reportDir = path.join(projectRoot, 'cypress', 'reports');
@@ -34,14 +34,29 @@ app.post('/run-test', upload.single('testFile'), async (req, res) => {
         await fs.ensureDir(cypressIntegrationPath);
         await fs.move(testFileOriginalPath, testFileNewPath);
 
-        // --- FIX: Create a basic cypress.json config file ---
-        const cypressConfig = {
-            "integrationFolder": "cypress/integration",
-            "videosFolder": "cypress/videos",
-            "screenshotsFolder": "cypress/screenshots",
-            "supportFile": false
-        };
-        await fs.writeJson(path.join(projectRoot, 'cypress.json'), cypressConfig);
+        // --- FIX: Create a modern cypress.config.js file for Cypress v10+ ---
+        const cypressConfigFileContent = `
+const { defineConfig } = require('cypress');
+
+module.exports = defineConfig({
+  e2e: {
+    specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
+    supportFile: false,
+  },
+  videosFolder: 'cypress/videos',
+  screenshotsFolder: 'cypress/screenshots',
+  reporter: 'mochawesome',
+  reporterOptions: {
+    reportDir: '${reportDir.replace(/\\/g, '\\\\')}', // Escape backslashes for Windows paths
+    reportFilename: '${reportFilename}',
+    overwrite: false,
+    html: true,
+    json: false,
+    quiet: true
+  }
+});
+`;
+        await fs.writeFile(path.join(projectRoot, 'cypress.config.js'), cypressConfigFileContent);
         // --- End of Fix ---
 
         console.log(`Running test: ${testFileNewPath}`);
@@ -50,15 +65,6 @@ app.post('/run-test', upload.single('testFile'), async (req, res) => {
             spec: testFileNewPath,
             config: {
                 video: false,
-            },
-            reporter: 'mochawesome',
-            reporterOptions: {
-                reportDir: reportDir,
-                reportFilename: reportFilename,
-                overwrite: false,
-                html: true,
-                json: false, // No need for separate json
-                quiet: true
             },
         });
 
