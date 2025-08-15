@@ -25,7 +25,7 @@ app.post('/run-test', upload.single('testFile'), async (req, res) => {
     const projectRoot = path.join(__dirname, `run-${Date.now()}`);
     const cypressIntegrationPath = path.join(projectRoot, 'cypress', 'e2e'); // Updated folder for Cypress v10+
     const testFileNewPath = path.join(cypressIntegrationPath, req.file.originalname);
-    
+
     const reportDir = path.join(projectRoot, 'cypress', 'reports');
     const reportFilename = `report.html`; // Simplified name
 
@@ -42,6 +42,17 @@ module.exports = defineConfig({
   e2e: {
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     supportFile: false,
+    setupNodeEvents(on, config) {
+      on('before:browser:launch', (browser = {}, launchOptions) => {
+        if (browser.family === 'chromium' && browser.name !== 'electron') {
+          // The following flags are often necessary for running in CI/Docker
+          launchOptions.args.push('--disable-gpu');
+          launchOptions.args.push('--no-sandbox');
+          launchOptions.args.push('--disable-dev-shm-usage');
+        }
+        return launchOptions;
+      });
+    },
   },
   videosFolder: 'cypress/videos',
   screenshotsFolder: 'cypress/screenshots',
@@ -62,25 +73,11 @@ module.exports = defineConfig({
         const results = await cypress.run({
             project: projectRoot,
             spec: testFileNewPath,
-            // --- FIX: Add browser launch options for Docker environment ---
-            browser: 'electron',
+            browser: 'electron', // Forcing electron browser which is more stable in CI
+            headed: false,
             config: {
                 video: false,
             },
-            headed: false,
-            // The following flags are often necessary for running in CI/Docker
-            config: {
-              "e2e": {
-                "setupNodeEvents(on, config)": {
-                  "on('before:browser:launch', (browser = {}, launchOptions) => {": {
-                    "if (browser.family === 'chromium' && browser.name !== 'electron')": {
-                      "launchOptions.args.push('--disable-gpu')": null
-                    },
-                    "return launchOptions": null
-                  }
-                }
-              }
-            }
         });
 
         const reportPath = path.join(reportDir, reportFilename);
@@ -89,10 +86,10 @@ module.exports = defineConfig({
             const reportHtml = await fs.readFile(reportPath, 'utf-8');
             res.send(reportHtml);
         } else {
-            if(results && results.message){
-                 res.status(500).send(`<h1>Test Run Failed</h1><p>The test runner failed to complete.</p><pre>${results.message}</pre>`);
+            if (results && results.message) {
+                res.status(500).send(`<h1>Test Run Failed</h1><p>The test runner failed to complete.</p><pre>${results.message}</pre>`);
             } else {
-                 res.status(500).send('<h1>Error</h1><p>Cypress test ran, but the report file was not generated.</p>');
+                res.status(500).send('<h1>Error</h1><p>Cypress test ran, but the report file was not generated.</p>');
             }
         }
 
@@ -102,7 +99,7 @@ module.exports = defineConfig({
     } finally {
         // Cleanup: remove the temporary project folder
         await fs.remove(projectRoot);
-        await fs.remove(testFileOriginalPath).catch(() => {}); // Also remove original upload just in case
+        await fs.remove(testFileOriginalPath).catch(() => { }); // Also remove original upload just in case
     }
 });
 
